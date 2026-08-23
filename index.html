@@ -58,6 +58,25 @@
     50%{ opacity:var(--max-o,0.85); }
   }
 
+  /* rising embers, echoing the candlelight */
+  .embers{ position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+
+  .ember{
+    position:absolute;
+    bottom:-5%;
+    border-radius:50%;
+    background:var(--gold-300);
+    box-shadow:0 0 6px 1px rgba(228,200,140,0.5);
+    animation:rise var(--dur,14s) linear var(--delay,0s) infinite;
+  }
+
+  @keyframes rise{
+    0%{ transform:translate(0,0); opacity:0; }
+    8%{ opacity:var(--max-o,0.55); }
+    92%{ opacity:var(--max-o,0.55); }
+    100%{ transform:translate(var(--drift,20px), -108vh); opacity:0; }
+  }
+
   /* cinematic edge vignette */
   body::before{
     content:'';
@@ -150,8 +169,14 @@
   }
 
   @keyframes moonGlow{
-    0%,100%{ filter:brightness(1); }
-    50%{ filter:brightness(1.12); }
+    0%,100%{
+      filter:brightness(1);
+      box-shadow:0 0 50px rgba(228,200,140,0.30), 0 0 110px rgba(228,200,140,0.12);
+    }
+    50%{
+      filter:brightness(1.12);
+      box-shadow:0 0 65px rgba(228,200,140,0.42), 0 0 135px rgba(228,200,140,0.20);
+    }
   }
 
   .moon.tapped{
@@ -197,6 +222,34 @@
     animation:fadeUp .9s ease 1.2s both;
   }
 
+  .ornament{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:0.6rem;
+    margin-bottom:1.4rem;
+    opacity:0;
+    animation:fadeUp .9s ease 1.0s both;
+  }
+
+  .ornament .line{
+    width:34px;
+    height:1px;
+    background:linear-gradient(to right, transparent, var(--gold-400));
+  }
+
+  .ornament .line.right{
+    background:linear-gradient(to left, transparent, var(--gold-400));
+  }
+
+  .ornament .diamond{
+    width:6px;
+    height:6px;
+    background:var(--gold-300);
+    transform:rotate(45deg);
+    box-shadow:0 0 8px rgba(228,200,140,0.6);
+  }
+
   .counter{
     font-family:'Inter',sans-serif;
     font-size:0.78rem;
@@ -205,6 +258,16 @@
     margin-top:1.75rem;
     opacity:0;
     animation:fadeUp 1s ease 3.6s both;
+  }
+
+  .phtime{
+    font-family:'Inter',sans-serif;
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    color:var(--slate-400);
+    margin-top:0.6rem;
+    opacity:0;
+    animation:fadeUp 1s ease 3.9s both;
   }
 
   .scrollcue{
@@ -314,7 +377,8 @@
     *{ animation:none !important; transition:none !important; }
     .moon::after{ left:10%; }
     .moon{ opacity:1; }
-    .hero-content .eyebrow, h1.milestone, .daterange, .counter{ opacity:1; transform:none; }
+    .hero-content .eyebrow, h1.milestone, .daterange, .counter, .phtime, .ornament{ opacity:1; transform:none; }
+    .embers{ display:none; }
     .divider::before, .divider::after{ width:min(28vw,140px); }
     .divider span{ opacity:1; transform:none; }
     .signature, .closing-line{ opacity:1; transform:none; }
@@ -325,6 +389,7 @@
 <body>
 
 <div class="stars" id="stars"></div>
+<div class="embers" id="embers"></div>
 <div class="grain"></div>
 
 <section class="hero">
@@ -333,8 +398,14 @@
     <p class="eyebrow">JM &amp; Jess</p>
     <div class="moon" aria-hidden="true"></div>
     <h1 class="milestone" id="milestone">One Month</h1>
+    <div class="ornament" aria-hidden="true">
+      <span class="line"></span>
+      <span class="diamond"></span>
+      <span class="line right"></span>
+    </div>
     <p class="daterange" id="daterange">July 11 — August 23</p>
     <p class="counter" id="counter"></p>
+    <p class="phtime" id="phtime"></p>
   </div>
   <div class="scrollcue" aria-hidden="true">↓</div>
 </section>
@@ -405,6 +476,30 @@
     if(el){ el.textContent = days + ' days, and counting'; }
   })();
 
+  // live Philippine time (GMT+8, no DST — safe to compute by fixed offset)
+  (function(){
+    var el = document.getElementById('phtime');
+    if(!el) return;
+
+    function update(){
+      var now = new Date();
+      var utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+      var ph = new Date(utcMs + 8 * 3600000);
+
+      var hours = ph.getHours();
+      var minutes = ph.getMinutes();
+      var ampm = hours >= 12 ? 'PM' : 'AM';
+      var h12 = hours % 12;
+      if(h12 === 0) h12 = 12;
+      var mm = minutes < 10 ? '0' + minutes : String(minutes);
+
+      el.textContent = 'GMT+8 · ' + h12 + ':' + mm + ' ' + ampm;
+    }
+
+    update();
+    setInterval(update, 1000);
+  })();
+
   // scatter a quiet starfield behind everything
   (function(){
     var field = document.getElementById('stars');
@@ -424,6 +519,29 @@
       s.style.setProperty('--min-o', (0.1 + Math.random()*0.15).toFixed(2));
       s.style.setProperty('--max-o', (0.5 + Math.random()*0.4).toFixed(2));
       frag.appendChild(s);
+    }
+    field.appendChild(frag);
+  })();
+
+  // a handful of embers drifting slowly upward, echoing the candlelight
+  (function(){
+    if(reduceMotion) return;
+    var field = document.getElementById('embers');
+    if(!field) return;
+    var count = window.innerWidth < 600 ? 10 : 16;
+    var frag = document.createDocumentFragment();
+    for(var i=0;i<count;i++){
+      var e = document.createElement('div');
+      e.className = 'ember';
+      var size = (Math.random()*2.4 + 1.6).toFixed(2);
+      e.style.width = size + 'px';
+      e.style.height = size + 'px';
+      e.style.left = (Math.random()*100).toFixed(2) + '%';
+      e.style.setProperty('--dur', (10 + Math.random()*10).toFixed(2) + 's');
+      e.style.setProperty('--delay', (Math.random()*14).toFixed(2) + 's');
+      e.style.setProperty('--drift', (Math.random()*40 - 20).toFixed(0) + 'px');
+      e.style.setProperty('--max-o', (0.35 + Math.random()*0.35).toFixed(2));
+      frag.appendChild(e);
     }
     field.appendChild(frag);
   })();
@@ -456,6 +574,7 @@
     if(reduceMotion) return;
     var content = document.querySelector('.hero-content');
     var cue = document.querySelector('.scrollcue');
+    var stars = document.getElementById('stars');
     if(!content) return;
     var ticking = false;
 
@@ -465,6 +584,7 @@
       content.style.opacity = String(Math.max(0, 1 - progress * 1.15));
       content.style.transform = 'translateY(' + (progress * 36) + 'px) scale(' + (1 - progress * 0.04) + ')';
       if(cue){ cue.style.opacity = String(Math.max(0, 0.6 - progress * 3)); }
+      if(stars){ stars.style.transform = 'translateY(' + (window.scrollY * -0.04) + 'px)'; }
       ticking = false;
     }
 
